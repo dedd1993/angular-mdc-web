@@ -1,8 +1,8 @@
-import { task } from 'gulp';
-import { composeRelease } from '../build-release';
-import { inlineResourcesForDirectory } from '../inline-resources';
-import { sequenceTask } from './sequence-task';
-import { BuildPackage } from '../build-package';
+import {task} from 'gulp';
+import {composeRelease} from '../build-release';
+import {inlineResourcesForDirectory} from '../inline-resources';
+import {sequenceTask} from './sequence-task';
+import {BuildPackage} from '../build-package';
 
 /** Creates a set of gulp tasks that can build the specified package. */
 export function createPackageBuildTasks(buildPackage: BuildPackage, preBuildTasks: string[] = []) {
@@ -28,13 +28,13 @@ export function createPackageBuildTasks(buildPackage: BuildPackage, preBuildTask
     // Inline assets into ESM output.
     `${taskName}:assets:inline`,
     // Build bundles on top of inlined ESM output.
-    `${taskName}:build:bundles`,
+    `${taskName}:build:bundles`
   ));
 
   /**
    * Release tasks for the package. Tasks compose the release output for the package.
    */
-  task(`${taskName}:build-release`, [`${taskName}:build`], () => composeRelease(buildPackage));
+  //task(`${taskName}:build-release`, [`${taskName}:build`], () => composeRelease(buildPackage));
 
   /**
    * TypeScript compilation tasks. Tasks are creating ESM, FESM, UMD bundles for releases.

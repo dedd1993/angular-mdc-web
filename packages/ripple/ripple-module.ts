@@ -6,6 +6,6 @@ import {
 
 @NgModule({
   exports: [MdcRippleDirective],
-  declarations: [MdcRippleDirective],
+  declarations: [MdcRippleDirective]
 })
 export class MdcRippleModule { }

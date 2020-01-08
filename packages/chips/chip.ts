@@ -367,6 +367,10 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
     }
   }
 
+  setSelectedFromChipSet(selected: boolean, shouldNotifyClients: boolean) {
+    this._foundation.setSelectedFromChipSet(selected, shouldNotifyClients);
+  }
+
   /** Allows for programmatic focusing of the chip. */
   focus(): void {
     this._getHostElement().focus();

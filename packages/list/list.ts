@@ -264,6 +264,8 @@ export class MdcList extends MDCComponent<any> implements AfterViewInit, OnDestr
       isFocusInsideList: () => this._platform.isBrowser ?
         this.elementRef.nativeElement.contains(document.activeElement) : false,
       isRootFocused: () => this._platform.isBrowser ? document.activeElement === this._getHostElement() : false,
+      listItemAtIndexHasClass: (index: number, className: string) =>
+        this.items.toArray()[index].getListItemElement().classList.contains(className),
       notifyAction: (index: number) => this.actionEvent.emit({ index: index })
     };
     return new MDCListFoundation(adapter);

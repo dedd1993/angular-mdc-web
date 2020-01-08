@@ -8,9 +8,9 @@ import {remapSourcemap} from './sourcemap-remap';
 
 // There are no type definitions available for these imports.
 const rollup = require('rollup');
-const rollupNodeResolutionPlugin = require('rollup-plugin-node-resolve');
-const rollupAlias = require('rollup-plugin-alias');
-const commonjs = require('rollup-plugin-commonjs');
+const rollupNodeResolutionPlugin = require('@rollup/plugin-node-resolve');
+const rollupAlias = require('@rollup/plugin-alias');
+const commonjs = require('@rollup/plugin-commonjs');
 const babel = require('rollup-plugin-babel');
 
 /** Directory where all bundles will be created in. */

@@ -39,7 +39,9 @@ import {MDCLinearProgressFoundation, MDCLinearProgressAdapter} from '@material/l
 export class MdcLinearProgress extends MDCComponent<MDCLinearProgressFoundation> implements OnInit {
 
   @Input()
-  get open(): boolean { return this._open; }
+  get open(): boolean {
+    return this._open;
+  }
   set open(value: boolean) {
     if (this._open !== value) {
       this._open = coerceBooleanProperty(value);
@@ -49,7 +51,9 @@ export class MdcLinearProgress extends MDCComponent<MDCLinearProgressFoundation>
   private _open: boolean = true;
 
   @Input()
-  get determinate(): boolean { return this._determinate; }
+  get determinate(): boolean {
+    return this._determinate;
+  }
   set determinate(value: boolean) {
     this._determinate = coerceBooleanProperty(value);
     this._foundation.setDeterminate(this._determinate);
@@ -58,7 +62,9 @@ export class MdcLinearProgress extends MDCComponent<MDCLinearProgressFoundation>
   private _determinate: boolean = false;
 
   @Input()
-  get reversed(): boolean { return this._reversed; }
+  get reversed(): boolean {
+    return this._reversed;
+  }
   set reversed(value: boolean) {
     this._reversed = coerceBooleanProperty(value);
     this._foundation.setReverse(this._reversed);
@@ -69,7 +75,9 @@ export class MdcLinearProgress extends MDCComponent<MDCLinearProgressFoundation>
   @Input() secondary: boolean = false;
 
   @Input()
-  get progress(): number { return this._progress; }
+  get progress(): number {
+    return this._progress;
+  }
   set progress(value: number) {
     this._progress = coerceNumberProperty(value);
     this._foundation.setProgress(this._progress);
@@ -78,7 +86,9 @@ export class MdcLinearProgress extends MDCComponent<MDCLinearProgressFoundation>
   private _progress: number = 0;
 
   @Input()
-  get buffer(): number { return this._buffer; }
+  get buffer(): number {
+    return this._buffer;
+  }
   set buffer(value: number) {
     this._buffer = coerceNumberProperty(value);
     this._foundation.setBuffer(this._buffer);
@@ -89,6 +99,7 @@ export class MdcLinearProgress extends MDCComponent<MDCLinearProgressFoundation>
   getDefaultFoundation() {
     const adapter: MDCLinearProgressAdapter = {
       addClass: (className: string) => this._getHostElement().classList.add(className),
+      forceLayout: () => (this._getHostElement()).offsetWidth,
       getPrimaryBar: () => this._getHostElement().querySelector('.mdc-linear-progress__primary-bar'),
       getBuffer: () => this._getHostElement().querySelector('.mdc-linear-progress__buffer'),
       hasClass: (className: string) => this._getHostElement().classList.contains(className),
