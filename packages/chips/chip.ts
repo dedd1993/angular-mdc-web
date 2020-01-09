@@ -293,23 +293,38 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
         }
       },
       eventTargetHasClass: (target: HTMLElement, className: string) => target.classList.contains(className),
+      focusPrimaryAction: () => {
+        if (this._primaryAction) {
+          (this._primaryAction as HTMLElement).focus();
+        }
+      },
+      focusTrailingAction: () => {
+        if (this._trailingAction) {
+          (this._trailingAction as HTMLElement).focus();
+        }
+      },
       notifyInteraction: () => this._emitSelectionChangeEvent(true),
       notifySelection: () => {},
+      notifyNavigation: () => {},
       notifyTrailingIconInteraction: () => this.trailingIconInteraction.emit({detail: {chipId: this.id}}),
       notifyRemoval: () => this.removed.emit({detail: {chipId: this.id, root: this}}),
-      getComputedStyleValue: (propertyName: string) => {
-        if (!this._platform.isBrowser) {
-          return '';
-        }
-        return window.getComputedStyle(this._getHostElement()).getPropertyValue(propertyName);
-      },
+      getComputedStyleValue: (propertyName: string) =>
+        this._platform.isBrowser ? window.getComputedStyle(this._getHostElement()).getPropertyValue(propertyName) : '',
       setStyleProperty: (propertyName: string, value: string) =>
         this._getHostElement().style.setProperty(propertyName, value),
+      setTrailingActionAttr: (attr, value) => {
+        if (this._trailingAction) {
+          this._trailingAction.setAttribute(attr, value);
+        }
+      },
       hasLeadingIcon: () => !!this.leadingIcon,
-      setAttr: (name: string, value: string) => this._elementRef.nativeElement.setAttribute(name, value),
+      hasTrailingAction: () => !!this._trailingAction,
+      setPrimaryActionAttr: (attr: string, value: string) => this._elementRef.nativeElement.setAttribute(attr, value),
       getRootBoundingClientRect: () => this._getHostElement().getBoundingClientRect(),
       getCheckmarkBoundingClientRect: () => this._checkmark ?
-        this._checkmark.elementRef.nativeElement.getBoundingClientRect() : null
+        this._checkmark.elementRef.nativeElement.getBoundingClientRect() : null,
+      isRTL: () => typeof window !== 'undefined' ?
+        window.getComputedStyle(this._getHostElement()).getPropertyValue('direction') === 'rtl' : false
     };
     return new MDCChipFoundation(adapter);
   }
@@ -402,6 +417,18 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
 
       this._changeDetectorRef.detectChanges();
     }
+  }
+
+  focusPrimaryAction() {
+    this._foundation.focusPrimaryAction();
+  }
+
+  focusTrailingAction() {
+    this._foundation.focusTrailingAction();
+  }
+
+  removeFocus() {
+    this._foundation.removeFocus();
   }
 
   private _loadListeners(): void {

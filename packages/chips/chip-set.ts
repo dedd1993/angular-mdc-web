@@ -139,16 +139,25 @@ export class MdcChipSet extends MDCComponent<MDCChipSetFoundation>
   getDefaultFoundation() {
     const adapter: MDCChipSetAdapter = {
       hasClass: (className: string) => this._getHostElement().classList.contains(className),
-      removeChip: (chipId: string) => {
-        const index = this._findChipIndex(chipId);
-        this.chips.toArray().splice(index, 1);
-      },
-      setSelected: (chipId: string, selected: boolean) => {
-        const chip = this.getChipById(chipId);
-        if (chip) {
-          chip.selected = selected;
+      focusChipPrimaryActionAtIndex: (index: number) => this.chips.toArray()[index].focusPrimaryAction(),
+      focusChipTrailingActionAtIndex: (index: number) => this.chips.toArray()[index].focusTrailingAction(),
+      getChipListCount: () => this.chips.length,
+      getIndexOfChipById: (chipId: string) => this._findChipIndex(chipId),
+      removeChipAtIndex: (index: number) => {
+        if (index >= 0 && index < this.chips.length) {
+          this.chips.toArray()[index].destroy();
+          this.chips.toArray()[index].remove();
+          this.chips.toArray().splice(index, 1);
         }
-      }
+      },
+      removeFocusFromChipAtIndex: (index: number) => this.chips.toArray()[index].removeFocus(),
+      selectChipAtIndex: (index: number, selected: boolean, shouldNotifyClients: boolean) => {
+        if (index >= 0 && index < this.chips.length) {
+          this.chips.toArray()[index].setSelectedFromChipSet(selected, shouldNotifyClients);
+        }
+      },
+      isRTL: () => typeof window !== 'undefined' ?
+        window.getComputedStyle(this._getHostElement()).getPropertyValue('direction') === 'rtl' : false
     };
     return new MDCChipSetFoundation(adapter);
   }
@@ -227,6 +236,10 @@ export class MdcChipSet extends MDCComponent<MDCChipSetFoundation>
     }
   }
 
+  private _findChipIndex(chipId: string): number {
+    return this.chips.toArray().findIndex(_ => _.id === chipId);
+  }
+
   /**
    * Finds and selects the chip based on its value.
    * @returns Chip that has the corresponding value.
@@ -303,10 +316,6 @@ export class MdcChipSet extends MDCComponent<MDCChipSetFoundation>
   private _listenToChipsRemoved(): void {
     this._chipRemoveSubscription = this.chipRemoveChanges
       .subscribe((event: MdcChipRemovedEvent) => this._foundation.handleChipRemoval(event.detail.chipId));
-  }
-
-  private _findChipIndex(chipId: string): number {
-    return this.chips.toArray().findIndex(_ => _.id === chipId);
   }
 
   /** Retrieves the DOM element of the component host. */
