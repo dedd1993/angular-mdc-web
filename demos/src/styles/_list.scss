@@ -12,5 +12,5 @@
 }
 
 .demo-list--shaped {
-  @include mdc-list-item-shape-radius(0 50px 50px 0);
+  @include mdc-list-single-line-shape-radius(0 50px 50px 0);
 }
