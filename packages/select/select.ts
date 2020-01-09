@@ -27,6 +27,7 @@ import {Platform} from '@angular/cdk/platform';
 import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
 
+import {MDCComponent} from '@angular-mdc/web/base';
 import {MdcRipple} from '@angular-mdc/web/ripple';
 import {MdcNotchedOutline} from '@angular-mdc/web/notched-outline';
 import {MdcFloatingLabel} from '@angular-mdc/web/floating-label';
@@ -45,7 +46,7 @@ import {MdcList, MdcListItemChange} from '@angular-mdc/web/list';
 import {MdcSelectIcon} from './select-icon';
 import {MDCSelectHelperText} from './select-helper-text';
 
-import {cssClasses, MDCSelectFoundation} from '@material/select';
+import {strings, MDCSelectFoundation, MDCSelectAdapter, MDCSelectFoundationMap} from '@material/select';
 
 /**
  * Represents the default options for mdc-select that can be configured
@@ -62,12 +63,15 @@ export interface MdcSelectDefaultOptions {
 export const MDC_SELECT_DEFAULT_OPTIONS =
   new InjectionToken<MdcSelectDefaultOptions>('MDC_SELECT_DEFAULT_OPTIONS');
 
-class MdcSelectBase {
+class MdcSelectBase extends MDCComponent<MDCSelectFoundation> {
   constructor(
+    public _elementRef: ElementRef<HTMLElement>,
     public _defaultErrorStateMatcher: ErrorStateMatcher,
     public _parentForm: NgForm,
     public _parentFormGroup: FormGroupDirective,
-    public ngControl: NgControl) {}
+    public ngControl: NgControl) {
+    super(_elementRef);
+  }
 }
 
 const _MdcSelectMixinBase: CanUpdateErrorStateCtor & typeof MdcSelectBase =
@@ -103,30 +107,19 @@ let nextUniqueId = 0;
   },
   template: `
   <ng-content select="mdc-icon"></ng-content>
-  <ng-container *ngIf="_list">
+  <div #anchorSelector class="mdc-select__anchor">
+    <i class="mdc-select__dropdown-icon"></i>
     <div #selectedText class="mdc-select__selected-text"
       [tabindex]="disabled ? '-1' : '0'"
       (blur)="onBlur()"
       (change)="onChange($event)"
       (focus)="onFocus()"
       (keydown)="onKeydown($event)"
-      (click)="onInteraction($event)">{{_enhancedSelectedText}}</div>
-    <ng-content select="mdc-menu"></ng-content>
-  </ng-container>
-  <i class="mdc-select__dropdown-icon"></i>
-  <select #nativeSelect *ngIf="!_list"
-   class="mdc-select__native-control"
-   [attr.aria-describedby]="_ariaDescribedby || null"
-   [required]="required"
-   [value]="value"
-   (click)="onInteraction($event)"
-   (blur)="onBlur()"
-   (change)="onChange($event)"
-   (focus)="onFocus()">
-    <ng-content></ng-content>
-  </select>
-  <label mdcFloatingLabel *ngIf="!outlined" [for]="id">{{placeholderText}}</label>
-  <mdc-line-ripple *ngIf="!outlined"></mdc-line-ripple>
+      (click)="onInteraction($event)">{{_selectedTextContent}}</div>
+      <label mdcFloatingLabel *ngIf="!outlined" [for]="id">{{placeholderText}}</label>
+      <mdc-line-ripple *ngIf="!outlined"></mdc-line-ripple>
+    <ng-content select="mdc-menu" class="mdc-select__menu"></ng-content>
+  </div>
   <mdc-notched-outline *ngIf="outlined" [label]="placeholderText" [for]="id"></mdc-notched-outline>
   `,
   providers: [
@@ -144,7 +137,7 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
   private _uniqueId: string = `mdc-select-${++nextUniqueId}`;
 
   controlType: string = 'mdc-select';
-  _enhancedSelectedText: string = '';
+  _selectedTextContent: string = '';
   focused: boolean = false;
 
   @Input() id: string = this._uniqueId;
@@ -210,11 +203,6 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
         if (!this._required) {
           this.valid = true;
           this._changeDetectorRef.markForCheck();
-        }
-
-        if (this.ngControl && !this._isEnhancedVariant()) {
-          this._required ? this._getInputElement().setAttribute('required', '') :
-            this._getInputElement().removeAttribute('required');
         }
       }
     }
@@ -299,7 +287,7 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
   @ViewChild(MdcFloatingLabel, {static: false}) _floatingLabel?: MdcFloatingLabel;
   @ViewChild(MdcLineRipple, {static: false}) _lineRipple?: MdcLineRipple;
   @ViewChild(MdcNotchedOutline, {static: false}) _notchedOutline?: MdcNotchedOutline;
-  @ViewChild('nativeSelect', {static: false}) _nativeSelect!: ElementRef<HTMLSelectElement>;
+  @ViewChild('anchorSelector', {static: false}) _anchorSelector!: ElementRef<HTMLElement>;
   @ViewChild('selectedText', {static: false}) _selectedText!: ElementRef<HTMLElement>;
   @ContentChild(MdcMenu, {static: false}) _menu!: MdcMenu;
   @ContentChild(MdcSelectIcon, {static: false}) leadingIcon?: MdcSelectIcon;
@@ -317,13 +305,50 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
     return !this._hasFloatingLabel() && this.getValue() ? '' : this.placeholder;
   }
 
-  private _createAdapter() {
-    return Object.assign(
-      this._isEnhancedVariant() ? this._getEnhancedSelectAdapterMethods() : this._getNativeSelectAdapterMethods(),
-      this._getCommonAdapterMethods(),
-      this._getOutlineAdapterMethods(),
-      this._getLabelAdapterMethods()
-    );
+  getDefaultFoundation() {
+    const adapter: MDCSelectAdapter = {
+      ...this._getSelectAdapterMethods(),
+      ...this._getCommonAdapterMethods(),
+      ...this._getOutlineAdapterMethods(),
+      ...this._getLabelAdapterMethods()
+    };
+    return new MDCSelectFoundation(adapter, this._getFoundationMap());
+  }
+
+  private _getSelectAdapterMethods() {
+    return {
+      getSelectedMenuItem: () => this._menu!.elementRef.nativeElement.querySelector(strings.SELECTED_ITEM_SELECTOR),
+      getMenuItemAttr: (menuItem: Element, attr: string) => menuItem.getAttribute(attr),
+      setSelectedText: (text: string) => this._selectedText.nativeElement.textContent = text,
+      isSelectedTextFocused: () => document.activeElement === this._selectedText.nativeElement,
+      getSelectedTextAttr: (attr: string) => this._selectedText.nativeElement.getAttribute(attr),
+      setSelectedTextAttr: (attr: string, value: string) => this._selectedText.nativeElement.setAttribute(attr, value),
+      openMenu: () => {
+        if (this._menu && !this._menu.open) {
+          this._menu.open = true;
+          this._selectedText!.nativeElement.setAttribute('aria-expanded', 'true');
+        }
+      },
+      closeMenu: () => {
+        if (this._menu && this._menu.open) {
+          this._menu.open = false;
+        }
+      },
+      getAnchorElement: () => this._anchorSelector.nativeElement,
+      setMenuAnchorElement: (anchorEl: HTMLElement) => this._menu.anchorElement = anchorEl,
+      setMenuAnchorCorner: (anchorCorner: any) => this._menu.anchorCorner = anchorCorner,
+      setMenuWrapFocus: (wrapFocus: boolean) => this._menu.wrapFocus = wrapFocus,
+      setAttributeAtIndex: (index: number, attributeName: string, attributeValue: string) =>
+        this._menu.listItems.toArray()[index].getListItemElement().setAttribute(attributeName, attributeValue),
+      removeAttributeAtIndex: (index: number, attributeName: string) =>
+        this._menu.listItems.toArray()[index].getListItemElement().removeAttribute(attributeName),
+      focusMenuItemAtIndex: (index: number) => this._menu.listItems.toArray()[index].focus(),
+      getMenuItemCount: () => this._menu.listItems.length,
+      getMenuItemValues: () => this._menu.listItems.map((el) => el.getListItemElement().getAttribute(strings.VALUE_ATTR) || ''),
+      getMenuItemTextAtIndex: (index: number) => this._menu.listItems.toArray()[index].getListItemElement().textContent as string,
+      addClassAtIndex: (index: number, className: string) => this._menu.listItems.toArray()[index].getListItemElement().classList.add(className),
+      removeClassAtIndex: (index: number, className: string) => this._menu.listItems.toArray()[index].getListItemElement().classList.remove(className)
+    };
   }
 
   private _getCommonAdapterMethods() {
@@ -347,53 +372,6 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
     };
   }
 
-  private _getNativeSelectAdapterMethods() {
-    return {
-      getValue: () => this._platform.isBrowser ? this._getInputElement().value : '',
-      setValue: (value: any) => this._getInputElement().value = value,
-      isMenuOpen: () => false,
-      setSelectedIndex: (index: number) => this._getInputElement().selectedIndex = index,
-      setDisabled: (isDisabled: boolean) => this._getInputElement().disabled = isDisabled,
-      setValid: (isValid: boolean) => {
-        if (this.ngControl) {
-          return;
-        }
-
-        isValid ? this._getHostElement().classList.remove(cssClasses.INVALID) :
-          this._getHostElement().classList.add(cssClasses.INVALID);
-      },
-      checkValidity: () => this._getInputElement().checkValidity()
-    };
-  }
-
-  private _getEnhancedSelectAdapterMethods() {
-    return {
-      getValue: () => this.getValue() || '',
-      openMenu: () => {
-        if (this._menu && !this._menu.open) {
-          this._menu.open = true;
-          this._selectedText!.nativeElement.setAttribute('aria-expanded', 'true');
-        }
-      },
-      closeMenu: () => {
-        if (this._menu && this._menu.open) {
-          this._menu.open = false;
-        }
-      },
-      isMenuOpen: () => this._menu && this._menu.open,
-      setDisabled: (isDisabled: boolean) => {
-        this._selectedText.nativeElement.setAttribute('aria-disabled', isDisabled.toString());
-      },
-      checkValidity: () => this._isValid(),
-      setValid: (isValid: boolean) => {
-        this._selectedText.nativeElement.setAttribute('aria-invalid', (!isValid).toString());
-        this._valid = isValid;
-        isValid ? this._getHostElement().classList.remove(cssClasses.INVALID) :
-          this._getHostElement().classList.add(cssClasses.INVALID);
-      }
-    };
-  }
-
   private _getOutlineAdapterMethods() {
     return {
       hasOutline: () => !!this._notchedOutline,
@@ -404,33 +382,18 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
 
   private _getLabelAdapterMethods() {
     return {
+      hasLabel: () => this._hasFloatingLabel(),
       floatLabel: (shouldFloat: boolean) => this._getFloatingLabel().float(shouldFloat),
       getLabelWidth: () => this._hasFloatingLabel() ? this._getFloatingLabel()!.getWidth() : 0
     };
   }
 
   /** Returns a map of all subcomponents to subfoundations.*/
-  private _getFoundationMap() {
+  private _getFoundationMap(): Partial<MDCSelectFoundationMap> {
     return {
       helperText: this._helperText ? this._helperText.foundation : undefined
     };
   }
-
-  private _foundation!: {
-    setSelectedIndex(index: number): void,
-    setValue(value: any): void,
-    setDisabled(isDisabled: boolean): void,
-    notchOutline(openNotch: boolean): void,
-    handleChange(didChange?: boolean): void,
-    handleFocus(): void,
-    handleBlur(): void,
-    handleClick(normalizedX: number): void,
-    handleKeydown(event: KeyboardEvent): void,
-    setValid(isValid: boolean): void,
-    layout(): void,
-    handleMenuOpened(): void,
-    handleMenuClosed(): void
-  };
 
   constructor(
     private _platform: Platform,
@@ -444,7 +407,7 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
     @Optional() _parentFormGroup: FormGroupDirective,
     @Optional() @Inject(MDC_SELECT_DEFAULT_OPTIONS) private _defaults: MdcSelectDefaultOptions) {
 
-    super(_defaultErrorStateMatcher, _parentForm, _parentFormGroup, ngControl);
+    super(elementRef, _defaultErrorStateMatcher, _parentForm, _parentFormGroup, ngControl);
 
     if (this.ngControl) {
       // Note: we provide the value accessor through here, instead of
@@ -466,18 +429,6 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
 
   ngAfterViewInit(): void {
     this.init();
-
-    if (!this._isEnhancedVariant()) {
-      this._options.changes.pipe(takeUntil(this._destroyed))
-        .subscribe(() => {
-          this._getFloatingLabel().float(!!this.getValue());
-
-          if (this.outlined) {
-            this.getValue() ?
-              this._notchedOutline!.notch(this._getFloatingLabel().getWidth()) : this._notchedOutline!.closeNotch();
-          }
-        });
-    }
   }
 
   ngOnDestroy(): void {
@@ -494,17 +445,16 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
   }
 
   init(): void {
-    this._foundation = new MDCSelectFoundation(this._createAdapter(), this._getFoundationMap());
     this._changeDetectorRef.detectChanges();
 
     // initialize after running a detectChanges()
     if (!this.outlined) {
-      this._ripple = new MdcRipple(this._nativeSelect ? this._nativeSelect : this._selectedText);
+      this._ripple = new MdcRipple(this._selectedText);
     }
     this._initializeSelection();
     this._setWidth();
-    this._enhancedSelectSetup();
-    this._foundation.handleChange(false);
+    this._selectBuilder();
+    this._foundation.handleChange();
   }
 
   writeValue(value: any): void {
@@ -557,11 +507,7 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
   }
 
   getSelectedIndex(): number {
-    if (this._isEnhancedVariant()) {
-      return this._list ? this._list.getSelectedIndex() : -1;
-    }
-
-    return (<HTMLSelectElement>this._getInputElement()).selectedIndex || -1;
+    return this._list ? this._list.getSelectedIndex() : -1;
   }
 
   /**
@@ -573,7 +519,9 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
       return;
     }
 
-    this._setEnhancedSelection(value); // if enhanced select, perform selection
+    this._list.setSelectedValue(value);
+    this._selectedTextContent = this._list.getSelectedText();
+    this._menu.open = false;
 
     this._value = value !== null ? value : '';
     if (!this.isValueEmpty()) {
@@ -594,14 +542,9 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
   }
 
   setSelectedIndex(index: number): void {
-    if (this._isEnhancedVariant()) {
-      this._list.setSelectedIndex(index);
-      this._getEnhancedSelectAdapterMethods().closeMenu();
-    } else {
-      this._getNativeSelectAdapterMethods().setSelectedIndex(index);
-    }
-
-    const value = this._isEnhancedVariant() ? this._list.getSelectedValue() : this._getInputElement().value;
+    this._list.setSelectedIndex(index);
+    const value = this._list.getSelectedValue();
+    this._foundation.setSelectedIndex(index, true)
     this.setSelectionByValue(value);
   }
 
@@ -616,15 +559,13 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
 
   focus(): void {
     if (!this.disabled) {
-      this._isEnhancedVariant() ? this._selectedText.nativeElement.focus() : this._getInputElement().focus();
+      this._selectedText.nativeElement.focus();
     }
   }
 
   reset(): void {
-    if (this._isEnhancedVariant()) {
-      this._enhancedSelectedText = '';
-      this._list.reset();
-    }
+    this._selectedTextContent = '';
+    this._list.reset();
     this._value = '';
     this.setSelectedIndex(-1);
     this._foundation.setValid(true);
@@ -686,56 +627,41 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
     }
   }
 
-  private _isEnhancedVariant(): boolean {
-    return !!this._list;
-  }
+  private _selectBuilder(): void {
+    this._menu.elementRef.nativeElement.classList.add('mdc-select__menu');
+    this._menu.anchorElement = this._getHostElement();
+    this._menu.wrapFocus = false;
 
-  private _setEnhancedSelection(value: any): void {
-    if (this._isEnhancedVariant()) {
-      this._list.setSelectedValue(value);
-      this._enhancedSelectedText = this._list.getSelectedText();
-      this._menu.open = false;
-    }
-  }
+    this._list.useSelectedClass = true;
+    this._list.singleSelection = true;
 
-  private _enhancedSelectSetup(): void {
-    if (this._isEnhancedVariant()) {
-      this._menu.elementRef.nativeElement.classList.add('mdc-select__menu');
-      this._menu.hoistToBody = true;
-      this._menu.anchorElement = this._getHostElement();
-      this._menu.wrapFocus = false;
+    // Subscribe to menu opened event
+    this._menu.opened.pipe(takeUntil(this._destroyed))
+      .subscribe(() => {
+        this._foundation.handleMenuOpened();
+        const selectedIndex = this._list.getSelectedIndex();
+        if (selectedIndex > -1) {
+          this._list.items.toArray()[selectedIndex].focus();
+        }
+      });
 
-      this._list.useSelectedClass = true;
-      this._list.singleSelection = true;
-
-      // Subscribe to menu opened event
-      this._menu.opened.pipe(takeUntil(this._destroyed))
-        .subscribe(() => {
-          this._foundation.handleMenuOpened();
-          const selectedIndex = this._list.getSelectedIndex();
-          if (selectedIndex > -1) {
-            this._list.items.toArray()[selectedIndex].focus();
+    // Subscribe to menu closed event
+    this._menu.closed.pipe(takeUntil(this._destroyed))
+      .subscribe(() => {
+        this._foundation.handleMenuClosed();
+        this._selectedText.nativeElement.removeAttribute('aria-expanded');
+        if (this._platform.isBrowser) {
+          if (document.activeElement !== this._selectedText.nativeElement) {
+            this._foundation.handleBlur();
           }
-        });
+        }
+      });
 
-      // Subscribe to menu closed event
-      this._menu.closed.pipe(takeUntil(this._destroyed))
-        .subscribe(() => {
-          this._foundation.handleMenuClosed();
-          this._selectedText.nativeElement.removeAttribute('aria-expanded');
-          if (this._platform.isBrowser) {
-            if (document.activeElement !== this._selectedText.nativeElement) {
-              this._foundation.handleBlur();
-            }
-          }
-        });
-
-      // Subscribe to menu selected event
-      this._list.selectionChange.pipe(takeUntil(this._destroyed))
-        .subscribe((evt: MdcListItemChange) => {
-          this.setSelectionByValue(evt.option.value, true);
-        });
-    }
+    // Subscribe to menu selected event
+    this._list.selectionChange.pipe(takeUntil(this._destroyed))
+      .subscribe((evt: MdcListItemChange) => {
+        this.setSelectionByValue(evt.option.value, true);
+      });
   }
 
   private _isValid(): boolean {
@@ -777,11 +703,6 @@ export class MdcSelect extends _MdcSelectMixinBase implements AfterContentInit, 
     } else {
       this._getHostElement().style.removeProperty('width');
     }
-  }
-
-  /** Retrieves the select input element. */
-  private _getInputElement(): HTMLSelectElement {
-    return this._nativeSelect.nativeElement;
   }
 
   /** Retrieves the DOM element of the component host. */
