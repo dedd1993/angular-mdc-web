@@ -36,6 +36,7 @@ export class MdcButtonLabel {}
     '(click)': 'onClick($event)'
   },
   template: `
+  <div class="mdc-button__ripple"></div>
   <mdc-button-label *ngIf="label">{{label}}</mdc-button-label>
   <ng-content></ng-content>
   `,
