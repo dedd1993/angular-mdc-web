@@ -299,7 +299,7 @@ export class MdcChipSet extends MDCComponent<MDCChipSetFoundation>
   private _listenForChipSelection(): void {
     this._chipSelectionSubscription = this.chipSelections
       .subscribe((event: MdcChipSelectionEvent) => {
-        this._foundation.handleChipSelection(event.detail.chipId, event.detail.selected);
+        this._foundation.handleChipSelection(event.detail.chipId, event.detail.selected, event.detail.shouldIgnore);
 
         if (event.isUserInput) {
           this._propagateChanges(event);

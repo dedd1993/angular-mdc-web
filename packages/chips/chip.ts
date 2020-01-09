@@ -19,6 +19,7 @@ import {
   Optional,
   Output,
   QueryList,
+  ViewChild,
   ViewEncapsulation
 } from '@angular/core';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
@@ -54,7 +55,8 @@ export interface MdcChipSelectionEvent extends MdcChipInteractionEvent {
   detail: {
     chipId: string,
     selected: boolean,
-    value: any
+    value: any,
+    shouldIgnore: boolean
   };
 }
 
@@ -127,7 +129,7 @@ export class MdcChipText {
   template: `
   <ng-content select="mdc-chip-icon[leading]"></ng-content>
   <mdc-chip-checkmark *ngIf="filter"></mdc-chip-checkmark>
-  <div class="mdc-chip__text" *ngIf="label">{{label}}</div>
+  <div #primaryAction class="mdc-chip__text mdc-chip__action--primary" *ngIf="label">{{label}}</div>
   <ng-content></ng-content>`,
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -149,6 +151,10 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
 
   get leadingIcon(): MdcChipIcon | undefined {
     return this._icons.find((_: MdcChipIcon) => _.leading);
+  }
+
+  get trailingIcon(): MdcChipIcon | undefined {
+    return this._icons.find((_: MdcChipIcon) => _.trailing);
   }
 
   @Input() label?: string;
@@ -276,6 +282,7 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
 
   @ContentChild(MdcChipCheckmark, {static: false}) _checkmark?: MdcChipCheckmark;
   @ContentChildren(forwardRef(() => MdcChipIcon), {descendants: true}) _icons!: QueryList<MdcChipIcon>;
+  @ViewChild('primaryAction', {static: true}) _primaryAction!: ElementRef<HTMLElement>;
 
   getDefaultFoundation() {
     const adapter: MDCChipAdapter = {
@@ -292,15 +299,16 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
           this.leadingIcon.elementRef.nativeElement.classList.remove(className);
         }
       },
-      eventTargetHasClass: (target: HTMLElement, className: string) => target.classList.contains(className),
+      eventTargetHasClass: (target: HTMLElement, className: string) =>
+        (target && (target as Element).classList) ? (target as Element).classList.contains(className) : false,
       focusPrimaryAction: () => {
         if (this._primaryAction) {
-          (this._primaryAction as HTMLElement).focus();
+          (this._primaryAction).nativeElement.focus();
         }
       },
       focusTrailingAction: () => {
-        if (this._trailingAction) {
-          (this._trailingAction as HTMLElement).focus();
+        if (this.trailingIcon) {
+          this.trailingIcon.elementRef.nativeElement.focus();
         }
       },
       notifyInteraction: () => this._emitSelectionChangeEvent(true),
@@ -312,13 +320,13 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
         this._platform.isBrowser ? window.getComputedStyle(this._getHostElement()).getPropertyValue(propertyName) : '',
       setStyleProperty: (propertyName: string, value: string) =>
         this._getHostElement().style.setProperty(propertyName, value),
-      setTrailingActionAttr: (attr, value) => {
-        if (this._trailingAction) {
-          this._trailingAction.setAttribute(attr, value);
+      setTrailingActionAttr: (attr: string, value: string) => {
+        if (this.trailingIcon) {
+          this.trailingIcon.elementRef.nativeElement.setAttribute(attr, value);
         }
       },
       hasLeadingIcon: () => !!this.leadingIcon,
-      hasTrailingAction: () => !!this._trailingAction,
+      hasTrailingAction: () => !!this.trailingIcon,
       setPrimaryActionAttr: (attr: string, value: string) => this._elementRef.nativeElement.setAttribute(attr, value),
       getRootBoundingClientRect: () => this._getHostElement().getBoundingClientRect(),
       getCheckmarkBoundingClientRect: () => this._checkmark ?
@@ -382,13 +390,35 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
     }
   }
 
-  setSelectedFromChipSet(selected: boolean, shouldNotifyClients: boolean) {
+  setSelectedFromChipSet(selected: boolean, shouldNotifyClients: boolean): void {
     this._foundation.setSelectedFromChipSet(selected, shouldNotifyClients);
   }
 
   /** Allows for programmatic focusing of the chip. */
   focus(): void {
     this._getHostElement().focus();
+  }
+
+  focusPrimaryAction(): void {
+    this._foundation.focusPrimaryAction();
+  }
+
+  focusTrailingAction(): void {
+    this._foundation.focusTrailingAction();
+  }
+
+  removeFocus(): void {
+    this._foundation.removeFocus();
+  }
+
+  /**
+   * Allows for programmatic removal of the chip.
+   * Informs any listeners of the removal request. Does not remove the chip from the DOM.
+   */
+  remove(): void {
+    if (this.removable) {
+      this._foundation.beginExit();
+    }
   }
 
   _handleInteraction(evt: KeyboardEvent | MouseEvent): void {
@@ -419,18 +449,6 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
     }
   }
 
-  focusPrimaryAction() {
-    this._foundation.focusPrimaryAction();
-  }
-
-  focusTrailingAction() {
-    this._foundation.focusTrailingAction();
-  }
-
-  removeFocus() {
-    this._foundation.removeFocus();
-  }
-
   private _loadListeners(): void {
     this._ngZone.runOutsideAngular(() =>
       fromEvent<TransitionEvent>(this._getHostElement(), 'transitionend')
@@ -447,7 +465,7 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
   private _emitSelectionChangeEvent(isUserInput?: boolean): void {
     this.selectionChange.emit({
       isUserInput: isUserInput,
-      detail: {chipId: this.id, selected: this._selected, value: this._value}
+      detail: {chipId: this.id, selected: this._selected, value: this._value, shouldIgnore: true}
     });
   }
 
@@ -469,6 +487,7 @@ export class MdcChip extends MDCComponent<MDCChipFoundation> implements AfterVie
     '[class.ngx-mdc-icon--inline]': 'inline',
     '[class.mdc-chip__icon--leading]': 'leading',
     '[class.mdc-chip__icon--trailing]': 'trailing',
+    '[class.mdc-chip__action--trailing]': 'trailing',
     '(click)': '_onIconInteraction($event)',
     '(keydown)': '_onIconInteraction($event)'
   },
